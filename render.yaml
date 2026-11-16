@@ -1,0 +1,28 @@
+# Render Infrastructure as Code Blueprint
+# https://render.com/docs/blueprint-spec
+services:
+  # 1. Full-Stack Web Service (Spring Boot + Embedded React Frontend)
+  - type: web
+    name: campus-placement-assistant
+    runtime: image
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: mysql
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: campus-placement-mysql
+          property: connectionString
+      - key: GEMINI_API_KEY
+        sync: false
+
+databases:
+  # 2. Managed MySQL Database
+  - name: campus-placement-mysql
+    databaseName: campus_placement_db
+    user: campus_admin
+    plan: free
+    region: oregon
