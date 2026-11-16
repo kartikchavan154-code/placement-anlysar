@@ -14,9 +14,7 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Non-root user for security
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
+RUN mkdir -p /app/uploads/resumes && chmod -R 777 /app/uploads
 
 COPY --from=builder /app/target/*.jar app.jar
 
@@ -24,4 +22,4 @@ ENV PORT=8080
 ENV SPRING_PROFILES_ACTIVE=mysql
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java -XX:+UseSerialGC -Xss512k -XX:MaxRAMPercentage=70.0 -Dserver.port=${PORT:-8080} -Djava.security.egd=file:/dev/./urandom -jar app.jar"]
