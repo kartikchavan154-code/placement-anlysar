@@ -79,7 +79,8 @@ export const resumeService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  getLatest: (studentId) => api.get(`/resumes/latest/${studentId}`),
+  getLatest: (studentId, targetJobRole) =>
+    api.get(`/resumes/latest/${studentId}`, { params: { targetJobRole } }),
 };
 
 // AI Services

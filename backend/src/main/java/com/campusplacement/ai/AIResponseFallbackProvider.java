@@ -11,46 +11,113 @@ public class AIResponseFallbackProvider {
     private static final Random RANDOM = new Random();
 
     public ResumeAnalysisDto generateResumeAnalysis(String fileName, String extractedText) {
+        return generateResumeAnalysis(fileName, extractedText, "Full Stack Software Developer");
+    }
+
+    public ResumeAnalysisDto generateResumeAnalysis(String fileName, String extractedText, String targetJobRole) {
+        if (targetJobRole == null || targetJobRole.trim().isEmpty()) {
+            targetJobRole = "Full Stack Software Developer";
+        }
+
         ResumeAnalysisDto dto = new ResumeAnalysisDto();
         dto.setFileName(fileName);
         dto.setRawExtractedText(extractedText);
 
-        // Analyze text to extract recognized tech skills
-        List<String> recognizedSkills = extractSkillsFromText(extractedText);
-        if (recognizedSkills.isEmpty()) {
-            recognizedSkills = Arrays.asList("Java", "Spring Boot", "React.js", "SQL", "Git", "REST APIs");
-        }
+        // 1. Extract technical skills present in the resume
+        List<String> rawSkills = extractSkillsFromText(extractedText);
+        final List<String> recognizedSkills = rawSkills.isEmpty() ? detectFallbackSkills(fileName, extractedText) : rawSkills;
         dto.setExtractedSkills(recognizedSkills);
 
-        // Identify high-value missing skills
-        List<String> missingSkills = Arrays.asList("Docker", "Kubernetes", "AWS Cloud", "CI/CD Pipelines", "System Design", "Unit Testing (JUnit/Mockito)");
+        // 2. Identify target role skills
+        List<String> coreSkills = getRequiredSkillsForRole(targetJobRole);
+        List<String> secondarySkills = getSecondarySkillsForRole(targetJobRole);
+
+        // 3. Compare extracted skills against target role
+        List<String> matchedSkills = new ArrayList<>();
+        List<String> missingSkills = new ArrayList<>();
+
+        for (String core : coreSkills) {
+            if (hasSkill(recognizedSkills, core) || containsWord(extractedText, core)) {
+                matchedSkills.add(core);
+            } else {
+                missingSkills.add(core);
+            }
+        }
+
+        for (String sec : secondarySkills) {
+            if (hasSkill(recognizedSkills, sec) || containsWord(extractedText, sec)) {
+                if (!matchedSkills.contains(sec)) {
+                    matchedSkills.add(sec);
+                }
+            } else {
+                if (!missingSkills.contains(sec) && missingSkills.size() < 6) {
+                    missingSkills.add(sec);
+                }
+            }
+        }
         dto.setMissingSkills(missingSkills);
 
-        int baseScore = 72 + Math.min(recognizedSkills.size() * 3, 20);
-        dto.setMatchScore(Math.min(baseScore, 95));
+        // 4. Calculate DYNAMIC ATS Match Score (varies significantly by resume content & target role)
+        double coreRatio = (double) (coreSkills.size() - countMissing(coreSkills, missingSkills)) / Math.max(1, coreSkills.size());
+        int corePoints = (int) Math.round(coreRatio * 56.0); // up to 56 points
 
-        dto.setEducationSummary("B.Tech / B.E. in Computer Science / Information Technology with strong academic track record.");
-        dto.setExperienceSummary("Relevant project portfolio showcasing full-stack application development, database modeling, and API integrations.");
+        long secondaryMatchedCount = secondarySkills.stream()
+                .filter(s -> hasSkill(recognizedSkills, s) || containsWord(extractedText, s))
+                .count();
+        int secondaryPoints = (int) Math.min(secondaryMatchedCount * 4, 18); // up to 18 points
 
-        dto.setStrengths(Arrays.asList(
-                "Strong foundational proficiency in core languages (" + String.join(", ", recognizedSkills.subList(0, Math.min(3, recognizedSkills.size()))) + ")",
-                "Hands-on project demonstrations with modern full-stack architectures",
-                "Clear academic profile and problem-solving focus"
-        ));
+        int structurePoints = evaluateResumeStructure(extractedText); // up to 16 points
 
-        dto.setSuggestions(Arrays.asList(
-                "Include quantifiable metrics in project bullet points (e.g., 'reduced API response latency by 35%')",
-                "Add cloud deployment experience (e.g., hosting containerized apps on AWS/GCP)",
-                "Enhance the resume layout with standard ATS section headings: Skills, Experience, Projects, Education",
-                "Earn an industry credential such as AWS Certified Cloud Practitioner or Oracle Java Associate"
-        ));
+        // Breadth bonus (number of distinct technical skills)
+        int breadthBonus = Math.min(recognizedSkills.size() * 2, 10); // up to 10 points
 
-        dto.setRecommendedJobRoles(Arrays.asList(
-                "Junior Full-Stack Software Engineer",
-                "Backend Java Developer",
-                "Cloud Application Developer",
-                "Software Development Engineer in Test (SDET)"
-        ));
+        int dynamicScore = corePoints + secondaryPoints + structurePoints + breadthBonus;
+        // Keep in realistic bounds (38% to 96%)
+        dynamicScore = Math.max(38, Math.min(dynamicScore, 96));
+        dto.setMatchScore(dynamicScore);
+
+        // 5. Dynamic Strengths
+        List<String> strengths = new ArrayList<>();
+        if (!matchedSkills.isEmpty()) {
+            strengths.add("Strong alignment in core " + targetJobRole + " competencies: " +
+                    String.join(", ", matchedSkills.subList(0, Math.min(4, matchedSkills.size()))));
+        }
+        if (recognizedSkills.size() >= 5) {
+            strengths.add("Demonstrated technical breadth across " + recognizedSkills.size() + " developer tools and frameworks");
+        }
+        if (containsWord(extractedText, "project") || containsWord(extractedText, "developed") || containsWord(extractedText, "built")) {
+            strengths.add("Evidence of hands-on project engineering and software delivery");
+        }
+        if (containsWord(extractedText, "api") || containsWord(extractedText, "rest") || containsWord(extractedText, "microservice")) {
+            strengths.add("Experience building and consuming modern web services and APIs");
+        }
+        if (strengths.isEmpty()) {
+            strengths.add("Foundational engineering background with strong aptitude for entry-level hiring");
+        }
+        dto.setStrengths(strengths);
+
+        // 6. Actionable Suggestions targeted directly to missing competencies
+        List<String> suggestions = new ArrayList<>();
+        if (!missingSkills.isEmpty()) {
+            String topMissing = String.join(", ", missingSkills.subList(0, Math.min(3, missingSkills.size())));
+            suggestions.add("Bridge high-priority keyword gaps for " + targetJobRole + ": incorporate proof of " + topMissing);
+        }
+        suggestions.add("Include quantifiable metrics in project bullet points (e.g., 'reduced API query latency by 35%', 'handled 500+ requests/sec')");
+        if (!containsWord(extractedText, "docker") && !containsWord(extractedText, "kubernetes") && !containsWord(extractedText, "aws")) {
+            suggestions.add("Add containerization (Docker) or cloud hosting (AWS / Render) to showcase modern deployment readiness");
+        }
+        if (!containsWord(extractedText, "test") && !containsWord(extractedText, "junit")) {
+            suggestions.add("Mention automated testing tools (JUnit, Mockito, or Jest) to signal clean code practices to ATS algorithms");
+        }
+        suggestions.add("Organize resume layout with standard ATS section headings: Summary, Technical Skills, Projects, Education");
+        dto.setSuggestions(suggestions);
+
+        // 7. Dynamic Education & Experience Summaries
+        dto.setEducationSummary(extractEducationSummary(extractedText));
+        dto.setExperienceSummary(extractExperienceSummary(extractedText, recognizedSkills, targetJobRole));
+
+        // 8. Recommended roles based on candidate's actual top skills
+        dto.setRecommendedJobRoles(determineBestFitRoles(recognizedSkills, targetJobRole));
 
         return dto;
     }
@@ -339,16 +406,139 @@ public class AIResponseFallbackProvider {
         List<String> found = new ArrayList<>();
         String[] dictionary = {
                 "Java", "Spring Boot", "React", "JavaScript", "TypeScript", "Python",
-                "C++", "C#", "SQL", "MySQL", "PostgreSQL", "MongoDB", "Git",
-                "Docker", "AWS", "HTML", "CSS", "REST", "Node.js", "Express",
-                "Linux", "Redis", "Kafka", "Machine Learning", "Data Structures"
+                "C++", "C#", "C", "Go", "Kotlin", "Swift", "SQL", "MySQL", "PostgreSQL",
+                "MongoDB", "Redis", "Oracle", "Git", "GitHub", "Docker", "Kubernetes",
+                "AWS", "GCP", "Azure", "Linux", "HTML", "CSS", "Tailwind CSS", "Bootstrap",
+                "REST", "REST APIs", "GraphQL", "Node.js", "Express", "Next.js", "Vue",
+                "Angular", "Kafka", "RabbitMQ", "Microservices", "CI/CD", "Jenkins",
+                "Terraform", "Machine Learning", "Deep Learning", "Pandas", "NumPy",
+                "Selenium", "JUnit", "Mockito", "TestNG", "Postman", "Data Structures",
+                "Algorithms", "System Design", "Agile", "Scrum", "Redux", "Hibernate", "JPA"
         };
         for (String skill : dictionary) {
             if (lower.contains(skill.toLowerCase())) {
-                found.add(skill);
+                if (!found.contains(skill)) {
+                    found.add(skill);
+                }
             }
         }
         return found;
+    }
+
+    private List<String> detectFallbackSkills(String fileName, String extractedText) {
+        String combined = ((fileName != null ? fileName : "") + " " + (extractedText != null ? extractedText : "")).toLowerCase();
+        List<String> detected = new ArrayList<>();
+        if (combined.contains("front") || combined.contains("react") || combined.contains("web")) {
+            detected.addAll(Arrays.asList("React", "JavaScript", "HTML", "CSS", "Git"));
+        } else if (combined.contains("data") || combined.contains("ai") || combined.contains("python")) {
+            detected.addAll(Arrays.asList("Python", "SQL", "Data Structures", "Git", "Machine Learning"));
+        } else {
+            detected.addAll(Arrays.asList("Java", "SQL", "Data Structures", "Git", "OOP"));
+        }
+        return detected;
+    }
+
+    private List<String> getRequiredSkillsForRole(String role) {
+        if (role == null) role = "Full Stack Software Developer";
+        String r = role.toLowerCase();
+        if (r.contains("front") || r.contains("react")) {
+            return Arrays.asList("React", "JavaScript", "HTML", "CSS", "TypeScript", "Git");
+        } else if (r.contains("back") || r.contains("java")) {
+            return Arrays.asList("Java", "Spring Boot", "SQL", "REST", "Git", "Database Design");
+        } else if (r.contains("cloud") || r.contains("devops")) {
+            return Arrays.asList("Docker", "Kubernetes", "AWS", "Linux", "CI/CD", "Git");
+        } else if (r.contains("data") || r.contains("machine") || r.contains("ml") || r.contains("ai")) {
+            return Arrays.asList("Python", "SQL", "Machine Learning", "Data Structures", "Git");
+        } else if (r.contains("test") || r.contains("sdet") || r.contains("qa")) {
+            return Arrays.asList("Java", "Selenium", "JUnit", "SQL", "Git", "Postman");
+        } else {
+            return Arrays.asList("Java", "Spring Boot", "React", "JavaScript", "SQL", "Git", "REST");
+        }
+    }
+
+    private List<String> getSecondarySkillsForRole(String role) {
+        if (role == null) role = "Full Stack Software Developer";
+        String r = role.toLowerCase();
+        if (r.contains("front") || r.contains("react")) {
+            return Arrays.asList("Tailwind CSS", "Redux", "Next.js", "REST APIs", "Bootstrap", "Jest");
+        } else if (r.contains("back") || r.contains("java")) {
+            return Arrays.asList("Microservices", "Hibernate", "JPA", "Docker", "PostgreSQL", "Redis", "Kafka");
+        } else if (r.contains("cloud") || r.contains("devops")) {
+            return Arrays.asList("Terraform", "Python", "GCP", "Azure", "Jenkins", "Ansible", "Prometheus");
+        } else if (r.contains("data") || r.contains("machine") || r.contains("ml") || r.contains("ai")) {
+            return Arrays.asList("Pandas", "NumPy", "Deep Learning", "TensorFlow", "PyTorch", "Big Data");
+        } else if (r.contains("test") || r.contains("sdet") || r.contains("qa")) {
+            return Arrays.asList("TestNG", "Mockito", "Cucumber", "CI/CD", "Rest Assured", "Cypress");
+        } else {
+            return Arrays.asList("Docker", "HTML", "CSS", "Tailwind CSS", "Microservices", "PostgreSQL", "Redis");
+        }
+    }
+
+    private boolean hasSkill(List<String> list, String skill) {
+        if (list == null || skill == null) return false;
+        String s = skill.toLowerCase();
+        return list.stream().anyMatch(item -> item.toLowerCase().equals(s) || item.toLowerCase().contains(s) || s.contains(item.toLowerCase()));
+    }
+
+    private boolean containsWord(String text, String word) {
+        if (text == null || word == null) return false;
+        return text.toLowerCase().contains(word.toLowerCase());
+    }
+
+    private int countMissing(List<String> required, List<String> missing) {
+        int count = 0;
+        for (String req : required) {
+            if (missing.stream().anyMatch(m -> m.equalsIgnoreCase(req))) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int evaluateResumeStructure(String text) {
+        if (text == null || text.trim().isEmpty()) return 6;
+        int pts = 6;
+        String lower = text.toLowerCase();
+        if (lower.contains("education") || lower.contains("academic") || lower.contains("b.tech") || lower.contains("degree")) pts += 3;
+        if (lower.contains("project") || lower.contains("experience") || lower.contains("developed") || lower.contains("built")) pts += 4;
+        if (lower.contains("skill") || lower.contains("technologies") || lower.contains("tools")) pts += 3;
+        return Math.min(pts, 16);
+    }
+
+    private String extractEducationSummary(String text) {
+        if (text != null) {
+            String lower = text.toLowerCase();
+            if (lower.contains("computer science") || lower.contains("cse")) {
+                return "B.Tech / B.E. in Computer Science & Engineering with strong academic foundation.";
+            } else if (lower.contains("information technology") || lower.contains("it")) {
+                return "B.Tech / B.E. in Information Technology with demonstrated coursework in software systems.";
+            } else if (lower.contains("electronics") || lower.contains("ece")) {
+                return "B.Tech in Electronics & Communication Engineering with demonstrated software computing skills.";
+            }
+        }
+        return "Bachelor of Technology / Engineering in Software Engineering discipline.";
+    }
+
+    private String extractExperienceSummary(String text, List<String> skills, String targetRole) {
+        int skillCount = skills != null ? skills.size() : 0;
+        return "Demonstrated portfolio featuring " + skillCount + " technical proficiencies. Applied skills to build functional academic and self-directed projects targeted at " + targetRole + " roles.";
+    }
+
+    private List<String> determineBestFitRoles(List<String> recognizedSkills, String currentTarget) {
+        List<String> roles = new ArrayList<>();
+        roles.add(currentTarget);
+        boolean hasJava = hasSkill(recognizedSkills, "Java");
+        boolean hasReact = hasSkill(recognizedSkills, "React");
+        boolean hasPython = hasSkill(recognizedSkills, "Python");
+        boolean hasCloud = hasSkill(recognizedSkills, "Docker") || hasSkill(recognizedSkills, "AWS");
+
+        if (hasJava && !roles.contains("Backend Java Developer")) roles.add("Backend Java Developer");
+        if (hasReact && !roles.contains("Frontend React Developer")) roles.add("Frontend React Developer");
+        if (hasPython && !roles.contains("Data & Machine Learning Engineer")) roles.add("Data & Machine Learning Engineer");
+        if (hasCloud && !roles.contains("Cloud & DevOps Engineer")) roles.add("Cloud & DevOps Engineer");
+        if (!roles.contains("Junior Full-Stack Software Engineer")) roles.add("Junior Full-Stack Software Engineer");
+
+        return roles.subList(0, Math.min(4, roles.size()));
     }
 
     private int calculateSkillMatch(Set<String> studentSkills, List<String> requiredSkills) {

@@ -22,6 +22,7 @@ public class JobDto {
     private Boolean isEligible;
     private Boolean hasApplied;
     private String applicationStatus;
+    private Integer matchScore;
     private LocalDateTime createdAt;
 
     public JobDto() {
@@ -161,6 +162,14 @@ public class JobDto {
 
     public void setApplicationStatus(String applicationStatus) {
         this.applicationStatus = applicationStatus;
+    }
+
+    public Integer getMatchScore() {
+        return matchScore;
+    }
+
+    public void setMatchScore(Integer matchScore) {
+        this.matchScore = matchScore;
     }
 
     public LocalDateTime getCreatedAt() {

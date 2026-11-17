@@ -139,12 +139,17 @@ public class ResumeServiceImpl implements ResumeService {
 
     @Override
     public ResumeAnalysisDto getLatestAnalysis(Long studentId) {
+        return getLatestAnalysis(studentId, null);
+    }
+
+    @Override
+    public ResumeAnalysisDto getLatestAnalysis(Long studentId, String targetJobRole) {
         Optional<Resume> resumeOpt = resumeRepository.findFirstByStudentIdOrderByUploadedAtDesc(studentId);
         if (resumeOpt.isEmpty()) {
             return null;
         }
         Resume resume = resumeOpt.get();
-        return aiService.analyzeResume(resume.getFileName(), resume.getRawExtractedText(), null);
+        return aiService.analyzeResume(resume.getFileName(), resume.getRawExtractedText(), targetJobRole);
     }
 }
 

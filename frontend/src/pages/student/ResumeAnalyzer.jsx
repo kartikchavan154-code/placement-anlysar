@@ -28,14 +28,14 @@ export const ResumeAnalyzer = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchLatestAnalysis();
-  }, [user]);
+    fetchLatestAnalysis(targetJobRole);
+  }, [user, targetJobRole]);
 
-  const fetchLatestAnalysis = async () => {
+  const fetchLatestAnalysis = async (role = targetJobRole) => {
     if (!user?.studentId) return;
     try {
       setFetchingExisting(true);
-      const res = await resumeService.getLatest(user.studentId);
+      const res = await resumeService.getLatest(user.studentId, role);
       if (res.data) {
         setAnalysis(res.data);
       }

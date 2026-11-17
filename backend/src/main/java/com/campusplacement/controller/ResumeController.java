@@ -27,8 +27,10 @@ public class ResumeController {
     }
 
     @GetMapping("/latest/{studentId}")
-    public ResponseEntity<ResumeAnalysisDto> getLatestAnalysis(@PathVariable Long studentId) {
-        ResumeAnalysisDto analysis = resumeService.getLatestAnalysis(studentId);
+    public ResponseEntity<ResumeAnalysisDto> getLatestAnalysis(
+            @PathVariable Long studentId,
+            @RequestParam(value = "targetJobRole", required = false) String targetJobRole) {
+        ResumeAnalysisDto analysis = resumeService.getLatestAnalysis(studentId, targetJobRole);
         if (analysis == null) {
             return ResponseEntity.noContent().build();
         }

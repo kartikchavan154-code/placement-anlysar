@@ -61,8 +61,8 @@ public class AIServiceImpl implements AIService {
             }
         }
 
-        // Return structured ATS analysis report
-        return fallbackProvider.generateResumeAnalysis(fileName, extractedText);
+        // Return structured ATS analysis report evaluated against target job role
+        return fallbackProvider.generateResumeAnalysis(fileName, extractedText, targetJobDescription);
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.campusplacement.service.impl;
 import com.campusplacement.dto.JobDto;
 import com.campusplacement.entity.Application;
 import com.campusplacement.entity.Job;
+import com.campusplacement.entity.Skill;
 import com.campusplacement.entity.Student;
 import com.campusplacement.exception.ResourceNotFoundException;
 import com.campusplacement.repository.ApplicationRepository;
@@ -12,8 +13,10 @@ import com.campusplacement.service.JobService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -159,10 +162,49 @@ public class JobServiceImpl implements JobService {
                 Optional<Application> appOpt = applicationRepository.findByStudentIdAndJobId(studentId, job.getId());
                 dto.setHasApplied(appOpt.isPresent());
                 dto.setApplicationStatus(appOpt.map(a -> a.getStatus().name()).orElse(null));
+
+                // Calculate dynamic ATS Match Score based on student skills vs job required skills
+                int calculatedMatch = calculateJobMatchScore(s, job);
+                dto.setMatchScore(calculatedMatch);
             }
         }
 
         return dto;
+    }
+
+    private int calculateJobMatchScore(Student student, Job job) {
+        if (job.getRequiredSkills() == null || job.getRequiredSkills().trim().isEmpty()) {
+            return 75;
+        }
+
+        String[] requiredArr = job.getRequiredSkills().split(",");
+        if (requiredArr.length == 0) return 75;
+
+        Set<String> studentSkillNames = new HashSet<>();
+        if (student.getSkills() != null) {
+            for (Skill sk : student.getSkills()) {
+                studentSkillNames.add(sk.getName().trim().toLowerCase());
+            }
+        }
+
+        int matchedCount = 0;
+        for (String req : requiredArr) {
+            String cleanReq = req.trim().toLowerCase();
+            if (studentSkillNames.stream().anyMatch(st -> st.contains(cleanReq) || cleanReq.contains(st))) {
+                matchedCount++;
+            }
+        }
+
+        double skillRatio = (double) matchedCount / requiredArr.length;
+        // Base score between 40 and 96 depending on skills coverage
+        int score = (int) Math.round(40 + (skillRatio * 52));
+
+        // Academic alignment bonus (+4 if high CGPA)
+        if (student.getCgpa() != null && job.getMinCgpa() != null && student.getCgpa() >= job.getMinCgpa() + 0.5) {
+            score = Math.min(score + 4, 98);
+        }
+
+        return Math.max(score, 35);
     }
 }
 

@@ -265,8 +265,17 @@ export const StudentDashboard = () => {
                   className="p-4 rounded-xl border border-slate-100 hover:border-indigo-200 bg-slate-50/50 hover:bg-indigo-50/20 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-bold text-slate-900">{job.title}</span>
+                      {job.matchScore != null && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          job.matchScore >= 80
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        }`}>
+                          {job.matchScore}% Match
+                        </span>
+                      )}
                       <span className="text-[11px] font-semibold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
                         {job.jobType}
                       </span>

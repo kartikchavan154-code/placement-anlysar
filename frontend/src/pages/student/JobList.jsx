@@ -148,14 +148,28 @@ export const JobList = () => {
               className="bg-white rounded-2xl p-6 border border-slate-200 card-shadow card-hover flex flex-col justify-between"
             >
               <div className="space-y-3">
-                {/* Company & Type */}
+                {/* Company & Type & Match */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm shadow-sm">
                     {job.company?.charAt(0) || 'C'}
                   </div>
-                  <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full">
-                    {job.jobType}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    {job.matchScore != null && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${
+                        job.matchScore >= 80
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : job.matchScore >= 60
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        <Sparkles className="w-2.5 h-2.5" />
+                        {job.matchScore}% ATS Fit
+                      </span>
+                    )}
+                    <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full">
+                      {job.jobType}
+                    </span>
+                  </div>
                 </div>
 
                 <div>
@@ -278,6 +292,22 @@ export const JobList = () => {
                 </span>
               </div>
             </div>
+
+            {selectedJob.matchScore != null && (
+              <div className={`p-3 rounded-xl flex items-center justify-between border ${
+                selectedJob.matchScore >= 80
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : selectedJob.matchScore >= 60
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+                  : 'bg-amber-50 border-amber-200 text-amber-800'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  <span className="text-xs font-bold">Estimated Profile & Skill Match Rating</span>
+                </div>
+                <span className="text-sm font-extrabold">{selectedJob.matchScore}% ATS Fit</span>
+              </div>
+            )}
 
             <div>
               <h5 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
